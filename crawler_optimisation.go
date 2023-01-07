@@ -18,7 +18,7 @@ const numWorkers = 10
 type ArrayOfArrays [][]string
 
 func read_json() []string{
-    const fileName = "urls.json"
+    const fileName = "image_json_anne.json"
     data, err := ioutil.ReadFile(fileName)
     // if we os.Open returns an error then handle it
     if err != nil {
@@ -40,7 +40,39 @@ func read_json() []string{
     return urls
 }
 
+func checkFileExists(filename string) (bool, error) {
+	_, err := os.Stat(filename)
+	if os.IsNotExist(err) {
+		return false, err
+	} else if err != nil {
+		fmt.Println("Error checking if file exists:", err)
+		return false, err
+	} else {
+		return true, nil
+	}
+}
+
 func download(url string, wg *sync.WaitGroup, bufPool *sync.Pool) {
+	parts := strings.Split(url, "/")
+	// Find the index of the "wp-content" part.
+	var wpContentIndex int
+	for i, part := range parts {
+		if part == "wp-content" {
+			wpContentIndex = i
+			break
+		}
+	}
+	dir_path := filepath.Join(parts[wpContentIndex+1:len(parts)-1]...)
+	file_path := filepath.Join(parts[wpContentIndex+1:]...)
+	// Check if file exists
+	exists, err := checkFileExists(file_path)
+	if exists {
+		s := fmt.Sprintf("File Exists: %s", file_path)
+		fmt.Println(s)
+		return
+	}
+	s := fmt.Sprintf("Downloading %s", file_path)
+	fmt.Println(s)
 
 	// Decrement the wait group counter when the goroutine completes
 	defer wg.Done()
@@ -66,19 +98,6 @@ func download(url string, wg *sync.WaitGroup, bufPool *sync.Pool) {
 	}
 	defer resp.Body.Close()
 
-
-	parts := strings.Split(url, "/")
-	// Find the index of the "wp-content" part.
-	var wpContentIndex int
-	for i, part := range parts {
-		if part == "wp-content" {
-			wpContentIndex = i
-			break
-		}
-	}
-	dir_path := filepath.Join(parts[wpContentIndex+1:len(parts)-1]...)
-	file_path := filepath.Join(parts[wpContentIndex+1:]...)
-	fmt.Println(file_path)
 	// Create the subdirectory.
 	err = os.MkdirAll(dir_path, 0755)
 	if err != nil {
