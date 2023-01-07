@@ -17,7 +17,7 @@ import (
 const numWorkers = 10
 type ArrayOfArrays [][]string
 
-func read_json() []string{
+func readJsonFile() []string{
     const fileName = "urls.json"
     data, err := ioutil.ReadFile(fileName)
     // if we os.Open returns an error then handle it
@@ -52,7 +52,7 @@ func checkFileExists(filename string) (bool, error) {
 	}
 }
 
-func download(url string, wg *sync.WaitGroup, bufPool *sync.Pool) {
+func download(url string, wg *sync.WaitGroup, bufPool *sync.Pool) error {
 	parts := strings.Split(url, "/")
 	// Find the index of the "wp-content" part.
 	var wpContentIndex int
@@ -70,7 +70,7 @@ func download(url string, wg *sync.WaitGroup, bufPool *sync.Pool) {
 	if exists {
 		s := fmt.Sprintf("File Exists: %s", file_path)
 		fmt.Println(s)
-		return
+		return nil
 	}
 
 
@@ -96,6 +96,7 @@ func download(url string, wg *sync.WaitGroup, bufPool *sync.Pool) {
 		fmt.Println(s)
 		time.Sleep(time.Minute)
 		download(url, wg, bufPool)
+		return err
 	}
 	defer resp.Body.Close()
 
@@ -121,6 +122,7 @@ func download(url string, wg *sync.WaitGroup, bufPool *sync.Pool) {
 	if err != nil {
 		fmt.Println(err)
 	}
+	return nil
 }
 
 func main() {
@@ -135,7 +137,7 @@ func main() {
 	}
 
 	// Add the URLs to the channel
-	result := read_json()
+	result := readJsonFile()
     for i, url := range result {
         if i == 0 {
             continue
@@ -146,7 +148,11 @@ func main() {
 			ticker := time.Tick(time.Second)
 			<-ticker
 		}
-		go download(url, &wg, bufPool)
+		err_download := download(url, &wg, bufPool)
+		if err_download != nil {
+			ticker := time.Tick(time.Minute)
+			<-ticker
+		}
     }
 
 	wg.Wait()
