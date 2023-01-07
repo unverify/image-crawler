@@ -18,7 +18,7 @@ const numWorkers = 10
 type ArrayOfArrays [][]string
 
 func read_json() []string{
-    const fileName = "image_json_anne.json"
+    const fileName = "urls.json"
     data, err := ioutil.ReadFile(fileName)
     // if we os.Open returns an error then handle it
     if err != nil {
@@ -64,6 +64,7 @@ func download(url string, wg *sync.WaitGroup, bufPool *sync.Pool) {
 	}
 	dir_path := filepath.Join(parts[wpContentIndex+1:len(parts)-1]...)
 	file_path := filepath.Join(parts[wpContentIndex+1:]...)
+
 	// Check if file exists
 	exists, err := checkFileExists(file_path)
 	if exists {
@@ -71,8 +72,7 @@ func download(url string, wg *sync.WaitGroup, bufPool *sync.Pool) {
 		fmt.Println(s)
 		return
 	}
-	s := fmt.Sprintf("Downloading %s", file_path)
-	fmt.Println(s)
+
 
 	// Decrement the wait group counter when the goroutine completes
 	defer wg.Done()
@@ -89,14 +89,18 @@ func download(url string, wg *sync.WaitGroup, bufPool *sync.Pool) {
 			MaxIdleConnsPerHost: numWorkers,
 		},
 	}
-
 	// Fetch the URL
 	resp, err := client.Get(url)
 	if err != nil {
-		time.Sleep(5 * time.Second)
+		s := fmt.Sprintf("Error Retry %s, err: ", url, err)
+		fmt.Println(s)
+		time.Sleep(time.Minute)
 		download(url, wg, bufPool)
 	}
 	defer resp.Body.Close()
+
+	s := fmt.Sprintf("Downloading %s from %s", file_path, url)
+	fmt.Println(s)
 
 	// Create the subdirectory.
 	err = os.MkdirAll(dir_path, 0755)
@@ -111,24 +115,13 @@ func download(url string, wg *sync.WaitGroup, bufPool *sync.Pool) {
 	}
 	defer file.Close()
 
-	fmt.Println("Downloading", url)
+	// fmt.Println("Downloading", url)
 	// Save the image data to a file
 	_, err = io.Copy(file, resp.Body)
 	if err != nil {
 		fmt.Println(err)
 	}
 }
-
-func worker(urls chan string, wg *sync.WaitGroup, bufPool *sync.Pool) {
-	// Decrement the wait group counter when the goroutine completes
-	defer wg.Done()
-
-	// Consume URLs from the channel until it is closed
-	for url := range urls {
-		download(url, wg, bufPool)
-	}
-}
-
 
 func main() {
 	var wg sync.WaitGroup
@@ -150,11 +143,11 @@ func main() {
 		// Add the URL to the wait group
 		wg.Add(1)
 		if i % 10 == 0 {
-			ticker := time.Tick(30 * time.Second)
+			ticker := time.Tick(time.Second)
 			<-ticker
 		}
 		go download(url, &wg, bufPool)
     }
-	// Wait for all goroutines to complete
+
 	wg.Wait()
 }
